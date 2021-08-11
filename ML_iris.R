@@ -1,0 +1,122 @@
+install.packages("caret")
+install.packages("kernlab")
+install.packages("randomForest")
+install.packages("ellipse")
+
+library(caret)
+library(kernlab)
+library(randomForest)
+library(ellipse)
+
+
+#Load The Data
+# attach the iris dataset to the environment
+data(iris)
+colnames(iris)
+colnames(iris) <- c("Sepal_Length","Sepal_Width","Petal_Length","Petal_Width","Species")
+colnames(iris)
+
+# create a list of 80% of the rows in the original dataset we can use for training
+
+index <- createDataPartition(iris$Species, p=0.80, list=FALSE)
+
+
+# select 20% of the data for Test
+
+test <- iris[-index,]
+dim(test)
+
+# use the remaining 80% of data to training 
+
+train <- iris[index,]
+dim(train)
+
+# list types for each attribute
+sapply(train, class)
+
+# take a peek at the first 6 rows of the data
+head(train)
+
+# list the levels for the class
+levels(train$Species)
+
+# summarize the class distribution
+percentage <- prop.table(table(train$Species)) * 100
+cbind(freq=table(train$Species), percentage=percentage)
+
+# summarize attribute distributions
+summary(train)
+
+# split input and output
+x <- train[,1:4]
+y <- train[,5]
+
+# boxplot for each attribute on one image
+par(mfrow=c(1,4))
+for(i in 1:4) {
+  boxplot(x[,i], main=names(iris)[i], col='violet')}
+
+# scatterplot matrix
+
+featurePlot(x, y, 'ellipse')
+
+# box and whisker plots for each attribute
+featurePlot(x, y, "box")
+
+# density plots for each attribute by class value
+scales <- list(x=list(relation="free"), y=list(relation="free"))
+featurePlot(x, y, "density", scales=scales)
+
+# Run algorithms using 10-fold cross validation
+control <- trainControl(method="cv", number=10)
+metric <- "Accuracy"
+
+#Build Models
+
+## a) linear algorithms
+set.seed(7)
+fit_lda <- train(Species~., data=train, method="lda", metric=metric, trControl=control)
+
+## b) nonlinear algorithms
+## CART
+set.seed(7)
+fit_cart <- train(Species~., data=train, method="rpart", metric=metric, trControl=control)
+## kNN
+set.seed(7)
+fit_knn <- train(Species~., data=train, method="knn", metric=metric, trControl=control)
+
+## c) advanced algorithms
+## SVM
+set.seed(7)
+fit_svm <- train(Species~., data=train, method="svmRadial", metric=metric, trControl=control)
+## Random Forest
+set.seed(7)
+fit_rf <- train(Species~., data=train, method="rf", metric=metric, trControl=control)
+
+#Select Best Model
+
+## summarize accuracy of models
+
+results <- resamples(list(lda=fit_lda, cart=fit_cart, knn=fit_knn, svm=fit_svm, rf=fit_rf))
+summary(results)
+
+
+##compare accuracy of models
+dotplot(results)
+
+
+lda_accuracy <- fit_lda$results$Accuracy
+cart_accuracy <- fit_cart$results$Accuracy
+knn_accuracy <- fit_lda$results$Accuracy
+svm_accuracy <- fit_lda$results$Accuracy
+rf_accuracy <- fit_lda$results$Accuracy
+
+knitr::kable(cbind(lda_accuracy, cart_accuracy, knn_accuracy,
+                   svm_accuracy, rf_accuracy))
+
+# summarize Best Model
+print(fit_lda)
+
+# estimate skill of LDA on the validation dataset
+predictions <- predict(fit_lda, test)
+confusionMatrix(predictions, test$Species)
